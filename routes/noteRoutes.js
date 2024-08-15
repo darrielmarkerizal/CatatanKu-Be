@@ -13,10 +13,59 @@ router.post("/", async (req, res) => {
 
 router.get("/", async (req, res) => {
     try {
-        const notes = await Note.findAll();
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+        const sortBy = req.query.sortBy || "newest";
+
+        let order;
+        switch (sortBy) {
+            case "newest":
+                order = [["createdAt", "DESC"]];
+                break;
+            case "oldest":
+                order = [["createdAt", "ASC"]];
+                break;
+            case "title-a-z":
+                order = [["title", "ASC"]];
+                break;
+            case "title-z-a":
+                order = [["title", "DESC"]];
+                break;
+            default:
+                order = [["createdAt", "DESC"]];
+        }
+
+        const { count, rows: notes } = await Note.findAndCountAll({
+            offset: offset,
+            limit: limit,
+            order: order,
+        });
+
+        const totalPages = Math.ceil(count / limit);
+        const hasPreviousPage = page > 1;
+        const hasNextPage = page < totalPages;
+
+        if (notes.length === 0) {
+            return res.status(200).json({
+                message: "No notes found",
+                notes: [],
+                page,
+                limit,
+                totalPages,
+                hasPreviousPage,
+                hasNextPage,
+            });
+        }
+
         res.status(200).json({
             message: "Notes retrieved successfully",
             notes,
+            page,
+            limit,
+            totalPages,
+            hasPreviousPage,
+            hasNextPage,
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
